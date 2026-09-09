@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { listarPacientes, crearPaciente } from '../../../lib/db';
 
 export async function GET() {
-  return NextResponse.json(listarPacientes());
+  const pacientes = await listarPacientes();
+  return NextResponse.json(pacientes);
 }
 
 export async function POST(request) {
@@ -12,6 +13,6 @@ export async function POST(request) {
     return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 });
   }
 
-  const paciente = crearPaciente(datos);
+  const paciente = await crearPaciente(datos);
   return NextResponse.json(paciente, { status: 201 });
 }

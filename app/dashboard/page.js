@@ -63,6 +63,7 @@ export default function DashboardPage() {
             setMostrarForm(false);
             cargarPacientes();
           }}
+          onCancelar={() => setMostrarForm(false)}
         />
       )}
 
@@ -98,7 +99,7 @@ export default function DashboardPage() {
   );
 }
 
-function NuevoPacienteForm({ onCreado }) {
+function NuevoPacienteForm({ onCreado, onCancelar }) {
   const [form, setForm] = useState({
     nombre: '',
     contacto: '',
@@ -121,17 +122,22 @@ function NuevoPacienteForm({ onCreado }) {
       return;
     }
     setEnviando(true);
-    const res = await fetch('/api/patients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    setEnviando(false);
-    if (res.ok) {
-      onCreado();
-    } else {
-      const data = await res.json();
-      setError(data.error || 'No se pudo crear el paciente.');
+    try {
+      const res = await fetch('/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        onCreado();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'No se pudo crear el paciente.');
+      }
+    } catch (err) {
+      setError('No se pudo conectar con el servidor. Inténtalo de nuevo.');
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -187,9 +193,14 @@ function NuevoPacienteForm({ onCreado }) {
 
       {error && <p className="text-sm text-red-700">{error}</p>}
 
-      <button type="submit" className="btn-primary" disabled={enviando}>
-        {enviando ? 'Guardando…' : 'Guardar paciente'}
-      </button>
+      <div className="flex gap-3">
+        <button type="submit" className="btn-primary" disabled={enviando}>
+          {enviando ? 'Guardando…' : 'Guardar paciente'}
+        </button>
+        <button type="button" className="btn-secondary" onClick={onCancelar} disabled={enviando}>
+          ← Volver
+        </button>
+      </div>
     </form>
   );
 }

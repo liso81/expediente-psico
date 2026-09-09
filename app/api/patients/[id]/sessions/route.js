@@ -3,7 +3,7 @@ import { agregarSesion } from '../../../../../lib/db';
 
 export async function POST(request, { params }) {
   const datos = await request.json();
-  const paciente = agregarSesion(params.id, datos);
+  const paciente = await agregarSesion(params.id, datos);
   if (!paciente) {
     return NextResponse.json({ error: 'Paciente no encontrado' }, { status: 404 });
   }
