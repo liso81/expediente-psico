@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
-  const router = useRouter();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -20,14 +18,13 @@ export default function LoginPage() {
         body: JSON.stringify({ password }),
       });
       if (res.ok) {
-        router.push('/dashboard');
-        router.refresh();
+        window.location.href = '/dashboard';
       } else {
         setError('Clave incorrecta. Inténtalo de nuevo.');
+        setCargando(false);
       }
     } catch (err) {
       setError('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
-    } finally {
       setCargando(false);
     }
   }
