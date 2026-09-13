@@ -13,17 +13,22 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setCargando(true);
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
-    setCargando(false);
-    if (res.ok) {
-      router.push('/dashboard');
-      router.refresh();
-    } else {
-      setError('Clave incorrecta. Inténtalo de nuevo.');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        router.push('/dashboard');
+        router.refresh();
+      } else {
+        setError('Clave incorrecta. Inténtalo de nuevo.');
+      }
+    } catch (err) {
+      setError('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      setCargando(false);
     }
   }
 
