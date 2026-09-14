@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -30,6 +30,15 @@ export default function PacientePage({ params }) {
     router.push('/dashboard');
   }
 
+  async function toggleArchivar() {
+    await fetch(`/api/patients/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archivado: !paciente.archivado }),
+    });
+    cargar();
+  }
+
   if (cargando) {
     return <main className="max-w-3xl mx-auto px-4 py-10 text-sm text-ink/50">Cargando…</main>;
   }
@@ -47,20 +56,36 @@ export default function PacientePage({ params }) {
     <main className="max-w-3xl mx-auto px-4 py-10">
       <Link href="/dashboard" className="text-sm text-ink/50 hover:text-ink">← Volver</Link>
 
-      <header className="flex items-start justify-between mt-3 mb-8">
-        <div>
-          <h1 className="font-serif text-2xl">{paciente.nombre}</h1>
-          <p className="text-sm text-ink/50">
-            {paciente.contacto || 'Sin contacto registrado'}
-            {paciente.fechaNacimiento ? ` · nacido/a ${paciente.fechaNacimiento}` : ''}
-          </p>
+      <header className="flex items-start justify-between mt-3 mb-6">
+        <div className="flex items-center gap-4">
+          <FotoPaciente paciente={paciente} onSubido={cargar} />
+          <div>
+            <h1 className="font-serif text-2xl">{paciente.nombre}</h1>
+            <p className="text-sm text-ink/50">
+              {paciente.contacto || 'Sin contacto registrado'}
+              {paciente.fechaNacimiento ? ` · nacido/a ${paciente.fechaNacimiento}` : ''}
+            </p>
+            {paciente.archivado && (
+              <span className="inline-block mt-1 text-xs field-label border border-line rounded px-2 py-0.5">
+                Archivado
+              </span>
+            )}
+          </div>
         </div>
-        <button onClick={eliminarPaciente} className="text-sm text-red-700/70 hover:text-red-700">
-          Eliminar expediente
-        </button>
       </header>
 
+      <div className="flex gap-4 mb-8">
+        <button onClick={toggleArchivar} className="text-sm text-ink/50 hover:text-ink underline">
+          {paciente.archivado ? 'Desarchivar' : 'Archivar'}
+        </button>
+        <button onClick={eliminarPaciente} className="text-sm text-red-700/70 hover:text-red-700 underline">
+          Eliminar expediente
+        </button>
+      </div>
+
       <FichaClinica paciente={paciente} onGuardado={cargar} />
+
+      <DocumentosPaciente paciente={paciente} onSubido={cargar} />
 
       <NuevaSesionForm pacienteId={id} onGuardado={cargar} />
 
@@ -108,6 +133,131 @@ export default function PacientePage({ params }) {
         )}
       </section>
     </main>
+  );
+}
+
+function FotoPaciente({ paciente, onSubido }) {
+  const [subiendo, setSubiendo] = useState(false);
+  const inputRef = useRef(null);
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSubiendo(true);
+    try {
+      const formData = new FormData();
+      formData.append('foto', file);
+      const res = await fetch(`/api/patients/${paciente.id}/foto`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) onSubido();
+    } finally {
+      setSubiendo(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {paciente.fotoUrl ? (
+        <img
+          src={paciente.fotoUrl}
+          alt=""
+          className="w-16 h-16 rounded-full object-cover border border-line"
+        />
+      ) : (
+        <div className="w-16 h-16 rounded-full bg-primary-light flex items-center justify-center text-primary font-serif text-xl">
+          {paciente.nombre?.[0]?.toUpperCase() || '?'}
+        </div>
+      )}
+      <div>
+        <input
+          type="file"
+          accept="image/*"
+          ref={inputRef}
+          className="hidden"
+          onChange={handleFile}
+        />
+        <button
+          type="button"
+          className="text-xs text-primary underline block"
+          onClick={() => inputRef.current?.click()}
+          disabled={subiendo}
+        >
+          {subiendo ? 'Subiendo…' : paciente.fotoUrl ? 'Cambiar foto' : '+ Foto'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DocumentosPaciente({ paciente, onSubido }) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState('');
+  const inputRef = useRef(null);
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setError('');
+    setSubiendo(true);
+    try {
+      const formData = new FormData();
+      formData.append('archivo', file);
+      const res = await fetch(`/api/patients/${paciente.id}/documentos`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        onSubido();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'No se pudo subir el archivo.');
+      }
+    } catch (err) {
+      setError('No se pudo conectar con el servidor.');
+    } finally {
+      setSubiendo(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  return (
+    <section className="card p-5 mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-serif text-lg">Documentos y tests</h2>
+        <div>
+          <input type="file" ref={inputRef} className="hidden" onChange={handleFile} />
+          <button
+            type="button"
+            className="btn-secondary text-sm"
+            onClick={() => inputRef.current?.click()}
+            disabled={subiendo}
+          >
+            {subiendo ? 'Subiendo…' : '+ Subir archivo'}
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-red-700 mb-2">{error}</p>}
+
+      {(!paciente.documentos || paciente.documentos.length === 0) ? (
+        <p className="text-sm text-ink/50">Todavía no hay documentos.</p>
+      ) : (
+        <ul className="space-y-2">
+          {paciente.documentos.map((doc) => (
+            <li key={doc.id} className="text-sm">
+              <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                {doc.nombre}
+              </a>
+              <span className="text-xs text-ink/40 ml-2">{doc.subidoEn?.slice(0, 10)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-ink/40 mt-3">Tamaño máximo por archivo: 4.5 MB.</p>
+    </section>
   );
 }
 

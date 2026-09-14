@@ -8,6 +8,7 @@ export default function DashboardPage() {
   const [pacientes, setPacientes] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
   const [cargando, setCargando] = useState(true);
   const router = useRouter();
 
@@ -19,7 +20,7 @@ export default function DashboardPage() {
     setCargando(true);
     const res = await fetch('/api/patients');
     const data = await res.json();
-    setPacientes(data);
+    setPacientes(Array.isArray(data) ? data : []);
     setCargando(false);
   }
 
@@ -29,7 +30,23 @@ export default function DashboardPage() {
     router.refresh();
   }
 
-  const filtrados = pacientes.filter((p) =>
+  async function archivar(id, archivarValor) {
+    await fetch(`/api/patients/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archivado: archivarValor }),
+    });
+    cargarPacientes();
+  }
+
+  async function eliminar(id, nombre) {
+    if (!confirm(`¿Eliminar el expediente de ${nombre} por completo? Esta acción no se puede deshacer.`)) return;
+    await fetch(`/api/patients/${id}`, { method: 'DELETE' });
+    cargarPacientes();
+  }
+
+  const visibles = pacientes.filter((p) => (mostrarArchivados ? p.archivado : !p.archivado));
+  const filtrados = visibles.filter((p) =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
@@ -45,7 +62,7 @@ export default function DashboardPage() {
         </button>
       </header>
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-3">
         <input
           className="input"
           placeholder="Buscar paciente por nombre…"
@@ -56,6 +73,13 @@ export default function DashboardPage() {
           {mostrarForm ? 'Cancelar' : '+ Nuevo paciente'}
         </button>
       </div>
+
+      <button
+        className="text-sm text-ink/50 underline mb-6"
+        onClick={() => setMostrarArchivados((v) => !v)}
+      >
+        {mostrarArchivados ? '← Ver pacientes activos' : 'Ver pacientes archivados'}
+      </button>
 
       {mostrarForm && (
         <NuevoPacienteForm
@@ -71,26 +95,45 @@ export default function DashboardPage() {
         <p className="text-sm text-ink/50">Cargando…</p>
       ) : filtrados.length === 0 ? (
         <div className="card p-8 text-center text-sm text-ink/50">
-          {pacientes.length === 0
+          {mostrarArchivados
+            ? 'No hay pacientes archivados.'
+            : pacientes.length === 0
             ? 'Todavía no hay pacientes. Da de alta el primero con "+ Nuevo paciente".'
             : 'No hay pacientes que coincidan con la búsqueda.'}
         </div>
       ) : (
         <ul className="space-y-2">
           {filtrados.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={`/patients/${p.id}`}
-                className="card flex items-center justify-between px-4 py-3 hover:border-primary transition-colors"
-              >
-                <div>
-                  <p className="font-medium">{p.nombre}</p>
-                  <p className="text-sm text-ink/50">{p.motivoConsulta || 'Sin motivo de consulta registrado'}</p>
+            <li key={p.id} className="card flex items-center justify-between px-4 py-3">
+              <Link href={`/patients/${p.id}`} className="flex-1 min-w-0 flex items-center gap-3">
+                {p.fotoUrl ? (
+                  <img src={p.fotoUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-line" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary font-serif shrink-0">
+                    {p.nombre?.[0]?.toUpperCase() || '?'}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{p.nombre}</p>
+                  <p className="text-sm text-ink/50 truncate">{p.motivoConsulta || 'Sin motivo de consulta registrado'}</p>
                 </div>
-                <span className="text-xs field-label border border-line rounded px-2 py-1">
-                  {p.estado === 'alta' ? 'De alta' : 'Activo'}
-                </span>
               </Link>
+              <div className="flex items-center gap-2 ml-2 shrink-0">
+                <button
+                  onClick={() => archivar(p.id, !p.archivado)}
+                  className="text-lg leading-none text-ink/40 hover:text-ink"
+                  title={p.archivado ? 'Desarchivar' : 'Archivar'}
+                >
+                  {p.archivado ? '📤' : '🗂'}
+                </button>
+                <button
+                  onClick={() => eliminar(p.id, p.nombre)}
+                  className="text-lg leading-none text-red-700/50 hover:text-red-700"
+                  title="Eliminar"
+                >
+                  🗑
+                </button>
+              </div>
             </li>
           ))}
         </ul>
